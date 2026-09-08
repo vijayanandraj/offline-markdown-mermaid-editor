@@ -7,7 +7,7 @@ A free, local-first Markdown editor with live preview and Mermaid diagram suppor
 - Side-by-side Markdown source and sanitized live preview
 - Mermaid fenced blocks rendered locally
 - Local image embedding as Base64, plus image URLs and relative paths
-- Formatting toolbar, dark mode, local autosave, download, HTML copy, and scroll sync
+- Formatting toolbar, dark mode, local autosave, Markdown download, PDF export, HTML copy, and scroll sync
 - Works without network access after its three browser dependencies are available
 
 ## Run locally
