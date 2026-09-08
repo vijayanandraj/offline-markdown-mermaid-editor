@@ -43,6 +43,10 @@ Import this GitHub repository into Vercel. Vercel runs `npm run build`, creating
 
 The editor stores drafts in the browser's local storage. It does not include an account system, analytics, or a document-upload service.
 
+## Support the project
+
+This project is free to use. If it helps you, [star it on GitHub](https://github.com/vijayanandraj/offline-markdown-mermaid-editor) to make it easier for others to find.
+
 ## License
 
 [MIT](LICENSE)
