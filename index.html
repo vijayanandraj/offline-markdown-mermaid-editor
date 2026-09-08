@@ -94,6 +94,51 @@
     'use strict';
     const STORAGE_KEY = 'offline-markdown-editor-content-v1';
     const THEME_KEY = 'offline-markdown-editor-theme-v1';
+    const DEFAULT_MARKDOWN = `# Markdown, diagrams, and ideas — in one place
+
+Welcome to a private, local-first workspace for turning rough notes into clear documents. Everything you write stays in this browser unless you choose to download it.
+
+> **Try it:** edit any text on the left and watch the clean, sanitized preview update on the right.
+
+## A tiny product brief
+
+Use familiar Markdown for structure, emphasis, lists, tables, links, code, and images.
+
+- **Fast to write** — keep your hands on the keyboard.
+- **Easy to share** — download the source as a `.md` file or copy the generated HTML.
+- **Diagram-ready** — add Mermaid blocks whenever a picture explains the system better.
+
+### A simple architecture
+
+\`\`\`mermaid
+flowchart LR
+  A[Write Markdown] --> B[Live preview]
+  B --> C[Sanitized HTML]
+  B --> D[Mermaid diagrams]
+  C --> E[Copy or export PDF]
+  D --> E
+
+  classDef accent fill:#2563eb,color:#fff,stroke:#1d4ed8;
+  class A,E accent;
+\`\`\`
+
+## Handy Markdown patterns
+
+| What you want | Type this |
+| --- | --- |
+| Bold text | \`**important**\` |
+| A link | \`[OpenAI](https://openai.com)\` |
+| Inline code | \`\`const ready = true\`\` |
+
+\`\`\`js
+// Code blocks keep formatting intact.
+const message = 'Build something clear.';
+console.log(message);
+\`\`\`
+
+---
+
+Start replacing this guide with your own notes. Your work is saved locally as you type.`;
     const editor = document.getElementById('editor');
     const preview = document.getElementById('preview');
     const editorStatus = document.getElementById('editorStatus');
@@ -108,8 +153,8 @@
       mermaid.initialize({ startOnLoad:false, securityLevel:'strict', theme:document.body.classList.contains('dark') ? 'dark' : 'default' });
     }
     function restoreState() {
-      try { editor.value = localStorage.getItem(STORAGE_KEY) || '# Welcome\n\nStart writing Markdown here.\n\n```mermaid\nflowchart LR\n  A[Write] --> B[Preview]\n```\n'; }
-      catch (_) { editor.value = '# Welcome\n\nStart writing Markdown here.'; setSaveStatus('Local storage is unavailable'); }
+      try { editor.value = localStorage.getItem(STORAGE_KEY) || DEFAULT_MARKDOWN; }
+      catch (_) { editor.value = DEFAULT_MARKDOWN; setSaveStatus('Local storage is unavailable'); }
       try { if (localStorage.getItem(THEME_KEY) === 'dark') document.body.classList.add('dark'); } catch (_) {}
       updateThemeButton(); configureMermaid();
     }
