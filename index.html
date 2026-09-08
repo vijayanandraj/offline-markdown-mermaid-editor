@@ -153,7 +153,7 @@ Start replacing this guide with your own notes. Your work is saved locally as yo
     function setSaveStatus(message) { saveStatus.textContent = message; }
     function configureMermaid() {
       if (!window.mermaid) return;
-      mermaid.initialize({ startOnLoad:false, securityLevel:'strict', theme:document.body.classList.contains('dark') ? 'dark' : 'default', flowchart:{ htmlLabels:false } });
+      mermaid.initialize({ startOnLoad:false, securityLevel:'strict', theme:document.body.classList.contains('dark') ? 'dark' : 'default', htmlLabels:false, flowchart:{ htmlLabels:false } });
     }
     function restoreState() {
       try { editor.value = localStorage.getItem(STORAGE_KEY) || DEFAULT_MARKDOWN; }
