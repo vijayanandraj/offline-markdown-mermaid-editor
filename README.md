@@ -7,8 +7,8 @@ A free, local-first Markdown editor with live preview and Mermaid diagram suppor
 - Side-by-side Markdown source and sanitized live preview
 - Mermaid fenced blocks rendered locally
 - Local image embedding as Base64, plus image URLs and relative paths
-- Formatting toolbar, dark mode, local autosave, Markdown download, PDF export, HTML copy, and scroll sync
-- Works without network access after its three browser dependencies are available
+- Formatting toolbar, dark mode, local autosave, Markdown download, PDF/DOCX export, HTML copy, and scroll sync
+- Works without network access after its browser dependencies are available
 
 ## Run locally
 
@@ -23,6 +23,7 @@ Then open `index.html` in a modern browser. The build copies the browser bundles
 vendor/marked.umd.js
 vendor/purify.min.js
 vendor/mermaid.min.js
+vendor/docx.iife.js
 ```
 
 ## Mermaid example
@@ -48,4 +49,4 @@ The editor stores drafts in the browser's local storage. It does not include an 
 
 ## Third-party software
 
-This project uses Marked, DOMPurify, and Mermaid. Their respective licenses apply to their bundled distributions.
+This project uses Marked, DOMPurify, Mermaid, and docx. Their respective licenses apply to their bundled distributions.

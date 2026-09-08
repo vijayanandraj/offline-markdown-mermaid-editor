@@ -7,6 +7,7 @@
   <script src="./vendor/marked.umd.js"></script>
   <script src="./vendor/purify.min.js"></script>
   <script src="./vendor/mermaid.min.js"></script>
+  <script src="./vendor/docx.iife.js"></script>
   <style>
     :root { --bg:#f4f6f8; --panel:#fff; --text:#1f2937; --muted:#6b7280; --border:#d1d5db; --accent:#2563eb; --toolbar:#111827; --toolbar-text:#f9fafb; --code-bg:#f3f4f6; --format-toolbar:#f8fafc; --error:#b91c1c; }
     body.dark { --bg:#111827; --panel:#1f2937; --text:#f3f4f6; --muted:#9ca3af; --border:#374151; --accent:#60a5fa; --toolbar:#030712; --toolbar-text:#f9fafb; --code-bg:#111827; --format-toolbar:#18202f; --error:#fca5a5; }
@@ -69,6 +70,7 @@
     <button id="themeButton" type="button">Dark mode</button>
     <button id="clearButton" type="button">Clear</button>
     <button id="pdfButton" type="button">Export PDF</button>
+    <button id="docxButton" type="button">Export DOCX</button>
     <button id="downloadButton" type="button">Download .md</button>
     <button id="copyButton" type="button">Copy HTML</button>
   </header>
@@ -145,6 +147,7 @@ Start replacing this guide with your own notes. Your work is saved locally as yo
     const saveStatus = document.getElementById('saveStatus');
     const themeButton = document.getElementById('themeButton');
     const imageInput = document.getElementById('imageInput');
+    const docxButton = document.getElementById('docxButton');
     let markdownRevision = 0, mermaidTimer = null, scrollFrame = null;
 
     function setSaveStatus(message) { saveStatus.textContent = message; }
@@ -163,7 +166,7 @@ Start replacing this guide with your own notes. Your work is saved locally as yo
     function save(markdown) { try { localStorage.setItem(STORAGE_KEY, markdown); setSaveStatus('Saved locally'); } catch (_) { setSaveStatus('Preview updated — local storage limit reached'); } }
     function renderMarkdown() {
       const revision = ++markdownRevision, markdown = editor.value;
-      if (!window.marked || !window.DOMPurify) { preview.textContent = 'Offline dependencies could not be loaded. Ensure the three files are present in ./vendor/.'; setSaveStatus('Dependencies unavailable'); return; }
+      if (!window.marked || !window.DOMPurify) { preview.textContent = 'Offline dependencies could not be loaded. Ensure the required files are present in ./vendor/.'; setSaveStatus('Dependencies unavailable'); return; }
       try {
         const parsed = marked.parse(markdown, { gfm:true, breaks:true });
         preview.innerHTML = DOMPurify.sanitize(parsed, { ADD_DATA_URI_TAGS:['img'] });
@@ -215,6 +218,73 @@ Start replacing this guide with your own notes. Your work is saved locally as yo
     }
     function downloadMarkdown() { const blob = new Blob([editor.value], {type:'text/markdown;charset=utf-8'}), link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'document.md'; link.click(); URL.revokeObjectURL(link.href); setSaveStatus('Markdown downloaded'); }
     function exportPdf() { setSaveStatus('Choose “Save as PDF” in the print dialog'); window.print(); }
+    function downloadBlob(blob, filename) { const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = filename; link.click(); URL.revokeObjectURL(link.href); }
+    function paragraphFrom(element, options={}) {
+      return new docx.Paragraph({ children:[new docx.TextRun({ text:element.innerText || element.textContent || '' })], ...options });
+    }
+    function documentTable(table) {
+      const rows = Array.from(table.rows).map((row, rowIndex) => new docx.TableRow({ children:Array.from(row.cells).map(cell => new docx.TableCell({
+        children:[paragraphFrom(cell, { spacing:{after:0} })],
+        shading:rowIndex === 0 ? { fill:'E5E7EB' } : undefined
+      })) }));
+      return new docx.Table({ rows, width:{ size:100, type:docx.WidthType.PERCENTAGE } });
+    }
+    async function imageRunFromUrl(source, width=600, height=360) {
+      const response = await fetch(source);
+      const data = await response.arrayBuffer();
+      const contentType = response.headers.get('content-type') || '';
+      const type = contentType.includes('jpeg') || contentType.includes('jpg') ? 'jpg' : contentType.includes('gif') ? 'gif' : 'png';
+      return new docx.ImageRun({ data, type, transformation:{ width, height } });
+    }
+    async function mermaidImageRun(holder) {
+      const svg = holder.querySelector('svg');
+      if (!svg) return null;
+      const clone = svg.cloneNode(true); clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      const source = new Blob([new XMLSerializer().serializeToString(clone)], { type:'image/svg+xml' });
+      const objectUrl = URL.createObjectURL(source);
+      try {
+        const image = new Image();
+        await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = reject; image.src = objectUrl; });
+        const ratio = image.naturalWidth && image.naturalHeight ? image.naturalHeight / image.naturalWidth : .55;
+        const width = Math.min(600, image.naturalWidth || 600), height = Math.round(width * ratio);
+        const canvas = document.createElement('canvas'); canvas.width = width * 2; canvas.height = height * 2;
+        const context = canvas.getContext('2d'); context.scale(2, 2); context.fillStyle = '#ffffff'; context.fillRect(0, 0, width, height); context.drawImage(image, 0, 0, width, height);
+        return imageRunFromUrl(canvas.toDataURL('image/png'), width, height);
+      } finally { URL.revokeObjectURL(objectUrl); }
+    }
+    async function previewToDocxChildren() {
+      const children = [];
+      for (const element of preview.children) {
+        const tag = element.tagName.toLowerCase();
+        if (/^h[1-6]$/.test(tag)) { children.push(paragraphFrom(element, { heading:docx.HeadingLevel[`HEADING_${tag.slice(1)}`] })); continue; }
+        if (tag === 'table') { children.push(documentTable(element)); continue; }
+        if (tag === 'ul' || tag === 'ol') { Array.from(element.children).forEach((item, index) => children.push(paragraphFrom(item, { text:undefined, children:[new docx.TextRun({ text:`${tag === 'ol' ? `${index + 1}.` : '•'} ${item.innerText}` })] }))); continue; }
+        if (tag === 'pre') { children.push(new docx.Paragraph({ children:[new docx.TextRun({ text:element.innerText, font:'Courier New' })], shading:{ fill:'F3F4F6' } })); continue; }
+        if (tag === 'hr') { children.push(new docx.Paragraph({ text:'' })); continue; }
+        if (element.classList.contains('mermaid')) {
+          try { const image = await mermaidImageRun(element); if (image) children.push(new docx.Paragraph({ children:[image], alignment:docx.AlignmentType.CENTER })); else children.push(paragraphFrom(element)); }
+          catch (_) { children.push(paragraphFrom(element)); }
+          continue;
+        }
+        const image = element.querySelector('img');
+        if (image && element.children.length === 1) {
+          try { children.push(new docx.Paragraph({ children:[await imageRunFromUrl(image.src, Math.min(600, image.naturalWidth || 600), Math.round(Math.min(600, image.naturalWidth || 600) * ((image.naturalHeight || 360) / (image.naturalWidth || 600))))] })); }
+          catch (_) { children.push(paragraphFrom(element)); }
+          continue;
+        }
+        children.push(paragraphFrom(element, tag === 'blockquote' ? { indent:{ left:720 } } : {}));
+      }
+      return children;
+    }
+    async function exportDocx() {
+      if (!window.docx) { setSaveStatus('DOCX support could not be loaded'); return; }
+      docxButton.disabled = true; setSaveStatus('Preparing DOCX…');
+      try {
+        const documentFile = new docx.Document({ sections:[{ children:await previewToDocxChildren() }] });
+        downloadBlob(await docx.Packer.toBlob(documentFile), 'document.docx'); setSaveStatus('DOCX downloaded');
+      } catch (error) { console.error('DOCX export error:', error); setSaveStatus('Could not export DOCX'); }
+      finally { docxButton.disabled = false; }
+    }
     function clearDocument() {
       if (!confirm('Clear the editor and remove the locally saved document?')) return;
       editor.value = '';
@@ -231,7 +301,7 @@ Start replacing this guide with your own notes. Your work is saved locally as yo
     editor.addEventListener('input', renderMarkdown); editor.addEventListener('scroll', syncPreviewScroll, {passive:true});
     editor.addEventListener('keydown', event => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'b') { event.preventDefault(); wrap('**'); } if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'i') { event.preventDefault(); wrap('*'); } if (event.key === 'Tab') { event.preventDefault(); replaceSelection('  '); } });
     themeButton.addEventListener('click', () => { const dark = document.body.classList.toggle('dark'); try { localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light'); } catch (_) {} updateThemeButton(); configureMermaid(); renderMarkdown(); });
-    document.getElementById('clearButton').addEventListener('click', clearDocument); document.getElementById('pdfButton').addEventListener('click', exportPdf); document.getElementById('downloadButton').addEventListener('click', downloadMarkdown); document.getElementById('copyButton').addEventListener('click', copyHtml);
+    document.getElementById('clearButton').addEventListener('click', clearDocument); document.getElementById('pdfButton').addEventListener('click', exportPdf); docxButton.addEventListener('click', exportDocx); document.getElementById('downloadButton').addEventListener('click', downloadMarkdown); document.getElementById('copyButton').addEventListener('click', copyHtml);
     restoreState(); renderMarkdown();
   })();
   </script>
