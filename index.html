@@ -153,7 +153,7 @@ Start replacing this guide with your own notes. Your work is saved locally as yo
     function setSaveStatus(message) { saveStatus.textContent = message; }
     function configureMermaid() {
       if (!window.mermaid) return;
-      mermaid.initialize({ startOnLoad:false, securityLevel:'strict', theme:document.body.classList.contains('dark') ? 'dark' : 'default' });
+      mermaid.initialize({ startOnLoad:false, securityLevel:'strict', theme:document.body.classList.contains('dark') ? 'dark' : 'default', flowchart:{ htmlLabels:false } });
     }
     function restoreState() {
       try { editor.value = localStorage.getItem(STORAGE_KEY) || DEFAULT_MARKDOWN; }
@@ -240,14 +240,16 @@ Start replacing this guide with your own notes. Your work is saved locally as yo
       const svg = holder.matches('svg') ? holder : holder.querySelector('svg');
       if (!svg) return null;
       const markup = svg.outerHTML.includes('xmlns=') ? svg.outerHTML : svg.outerHTML.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
-      const bounds = svg.getBoundingClientRect();
-      const width = Math.min(600, Math.round(bounds.width || 600)), height = Math.round(bounds.height || (width * .55));
-      // Word supports SVG directly. A transparent PNG keeps the DOCX compatible with
-      // readers that require a raster fallback without relying on a tainted canvas.
-      return new docx.ImageRun({
-        data:new TextEncoder().encode(markup), type:'svg', transformation:{ width, height },
-        fallback:{ data:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL9+QAAAABJRU5ErkJggg==', type:'png' }
-      });
+      const source = new Blob([markup], { type:'image/svg+xml' });
+      const objectUrl = URL.createObjectURL(source);
+      try {
+        const image = new Image();
+        await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = reject; image.src = objectUrl; });
+        const width = Math.min(600, image.naturalWidth || 600), height = Math.round(width * ((image.naturalHeight && image.naturalWidth) ? image.naturalHeight / image.naturalWidth : .55));
+        const canvas = document.createElement('canvas'); canvas.width = width * 2; canvas.height = height * 2;
+        const context = canvas.getContext('2d'); context.scale(2, 2); context.fillStyle = '#ffffff'; context.fillRect(0, 0, width, height); context.drawImage(image, 0, 0, width, height);
+        return imageRunFromUrl(canvas.toDataURL('image/png'), width, height);
+      } finally { URL.revokeObjectURL(objectUrl); }
     }
     async function previewToDocxChildren() {
       const children = [];
