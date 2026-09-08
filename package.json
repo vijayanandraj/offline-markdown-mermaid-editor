@@ -1,0 +1,14 @@
+{
+  "name": "offline-markdown-mermaid-editor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A private, local-first Markdown and Mermaid editor that runs in the browser.",
+  "scripts": {
+    "build": "node scripts/copy-vendor.mjs"
+  },
+  "dependencies": {
+    "dompurify": "3.3.1",
+    "marked": "17.0.1",
+    "mermaid": "11.12.0"
+  }
+}

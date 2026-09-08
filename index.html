@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Offline Markdown Editor</title>
+  <script src="./vendor/marked.umd.js"></script>
+  <script src="./vendor/purify.min.js"></script>
+  <script src="./vendor/mermaid.min.js"></script>
+  <style>
+    :root { --bg:#f4f6f8; --panel:#fff; --text:#1f2937; --muted:#6b7280; --border:#d1d5db; --accent:#2563eb; --toolbar:#111827; --toolbar-text:#f9fafb; --code-bg:#f3f4f6; --format-toolbar:#f8fafc; --error:#b91c1c; }
+    body.dark { --bg:#111827; --panel:#1f2937; --text:#f3f4f6; --muted:#9ca3af; --border:#374151; --accent:#60a5fa; --toolbar:#030712; --toolbar-text:#f9fafb; --code-bg:#111827; --format-toolbar:#18202f; --error:#fca5a5; }
+    * { box-sizing:border-box; }
+    html, body { height:100%; margin:0; font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--bg); color:var(--text); }
+    body { display:flex; flex-direction:column; overflow:hidden; }
+    button { border:1px solid #4b5563; border-radius:6px; padding:8px 11px; background:#1f2937; color:#fff; font:inherit; font-size:14px; cursor:pointer; }
+    button:hover { background:#374151; }
+    button:focus-visible, textarea:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+    .toolbar { min-height:58px; display:flex; align-items:center; gap:10px; padding:10px 14px; flex-wrap:wrap; background:var(--toolbar); color:var(--toolbar-text); border-bottom:1px solid var(--border); }
+    .toolbar h1 { margin:0 auto 0 0; font-size:18px; font-weight:650; }
+    .toolbar .status { font-size:12px; color:#cbd5e1; }
+    .workspace { flex:1; min-height:0; display:grid; grid-template-columns:1fr 1fr; }
+    .pane { min-width:0; min-height:0; display:flex; flex-direction:column; background:var(--panel); }
+    .pane:first-child { border-right:1px solid var(--border); }
+    .pane-header { min-height:42px; display:flex; align-items:center; justify-content:space-between; padding:8px 14px; border-bottom:1px solid var(--border); color:var(--muted); font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+    .format-toolbar { display:flex; align-items:center; gap:6px; padding:8px 10px; flex-wrap:wrap; border-bottom:1px solid var(--border); background:var(--format-toolbar); }
+    .format-toolbar button { padding:6px 9px; border-color:var(--border); background:var(--panel); color:var(--text); font-size:13px; }
+    .format-toolbar button:hover { background:var(--code-bg); }
+    .separator { width:1px; height:24px; margin:0 3px; background:var(--border); }
+    #editor { flex:1; width:100%; min-height:0; resize:none; border:0; padding:20px; background:var(--panel); color:var(--text); font-family:"Cascadia Code","SFMono-Regular",Consolas,monospace; font-size:15px; line-height:1.65; tab-size:2; }
+    #editor:focus { outline:none; }
+    #preview { flex:1; min-height:0; overflow:auto; padding:20px 28px 50px; line-height:1.7; overflow-wrap:anywhere; }
+    #preview > :first-child { margin-top:0; }
+    #preview h1, #preview h2, #preview h3, #preview h4 { line-height:1.25; margin-top:1.5em; margin-bottom:.6em; }
+    #preview h1 { padding-bottom:.3em; border-bottom:1px solid var(--border); }
+    #preview a { color:var(--accent); }
+    #preview blockquote { margin-left:0; padding:4px 16px; color:var(--muted); border-left:4px solid var(--border); }
+    #preview code { padding:.15em .35em; border-radius:4px; background:var(--code-bg); font-family:"Cascadia Code","SFMono-Regular",Consolas,monospace; font-size:.9em; }
+    #preview pre { padding:14px; overflow:auto; border:1px solid var(--border); border-radius:7px; background:var(--code-bg); }
+    #preview pre code { padding:0; background:transparent; }
+    #preview table { width:100%; border-collapse:collapse; display:block; overflow-x:auto; }
+    #preview th, #preview td { padding:8px 10px; border:1px solid var(--border); text-align:left; }
+    #preview th { background:var(--code-bg); }
+    #preview img { max-width:100%; height:auto; }
+    #preview hr { border:0; border-top:1px solid var(--border); margin:24px 0; }
+    #preview .mermaid { width:100%; margin:20px 0; overflow-x:auto; text-align:center; }
+    #preview .mermaid svg { max-width:100%; height:auto; }
+    .mermaid-error { margin:16px 0; padding:12px; border:1px solid var(--error); border-radius:7px; background:var(--code-bg); color:var(--text); }
+    .mermaid-error-title { margin-bottom:8px; font-weight:700; color:var(--error); }
+    .mermaid-error pre { margin:0; }
+    .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+    @media (max-width:800px) { body { overflow:auto; } .toolbar h1 { width:100%; } .workspace { min-height:calc(100vh - 120px); grid-template-columns:1fr; grid-template-rows:minmax(420px,1fr) minmax(420px,1fr); } .pane:first-child { border-right:0; border-bottom:1px solid var(--border); } }
+  </style>
+</head>
+<body>
+  <header class="toolbar">
+    <h1>Markdown Editor</h1>
+    <span id="saveStatus" class="status" aria-live="polite">Saved locally</span>
+    <button id="themeButton" type="button">Dark mode</button>
+    <button id="clearButton" type="button">Clear</button>
+    <button id="downloadButton" type="button">Download .md</button>
+    <button id="copyButton" type="button">Copy HTML</button>
+  </header>
+  <main class="workspace">
+    <section class="pane" aria-label="Markdown source">
+      <div class="pane-header"><span>Markdown</span><span id="editorStatus">0 words · 0 characters</span></div>
+      <div class="format-toolbar" aria-label="Formatting toolbar">
+        <button type="button" data-action="h1" title="Heading 1">H1</button><button type="button" data-action="h2" title="Heading 2">H2</button><button type="button" data-action="h3" title="Heading 3">H3</button><span class="separator"></span>
+        <button type="button" data-action="bold" title="Bold (Ctrl+B)"><b>B</b></button><button type="button" data-action="italic" title="Italic (Ctrl+I)"><i>I</i></button><button type="button" data-action="strike" title="Strikethrough">S̶</button><button type="button" data-action="inlineCode" title="Inline code">&lt;/&gt;</button><span class="separator"></span>
+        <button type="button" data-action="quote" title="Block quote">Quote</button><button type="button" data-action="bullets" title="Bullet list">Bullets</button><button type="button" data-action="numbered" title="Numbered list">Numbered</button><button type="button" data-action="link" title="Insert link">Link</button><span class="separator"></span>
+        <button type="button" data-action="imageFile" title="Embed local image">Image file</button><button type="button" data-action="imagePath" title="Image URL or relative path">Image URL</button><button type="button" data-action="codeBlock" title="Code block">Code block</button><button type="button" data-action="mermaid" title="Mermaid diagram">Mermaid</button><button type="button" data-action="table" title="Table">Table</button><button type="button" data-action="hr" title="Horizontal rule">HR</button>
+      </div>
+      <input id="imageInput" class="sr-only" type="file" accept="image/*">
+      <textarea id="editor" aria-label="Markdown editor" spellcheck="true" placeholder="Type or paste Markdown here..."></textarea>
+    </section>
+    <section class="pane" aria-label="Rendered preview">
+      <div class="pane-header"><span>Live preview</span><span>Sanitized HTML</span></div>
+      <article id="preview" aria-live="polite"></article>
+    </section>
+  </main>
+  <script>
+  (() => {
+    'use strict';
+    const STORAGE_KEY = 'offline-markdown-editor-content-v1';
+    const THEME_KEY = 'offline-markdown-editor-theme-v1';
+    const editor = document.getElementById('editor');
+    const preview = document.getElementById('preview');
+    const editorStatus = document.getElementById('editorStatus');
+    const saveStatus = document.getElementById('saveStatus');
+    const themeButton = document.getElementById('themeButton');
+    const imageInput = document.getElementById('imageInput');
+    let markdownRevision = 0, mermaidTimer = null, scrollFrame = null;
+
+    function setSaveStatus(message) { saveStatus.textContent = message; }
+    function configureMermaid() {
+      if (!window.mermaid) return;
+      mermaid.initialize({ startOnLoad:false, securityLevel:'strict', theme:document.body.classList.contains('dark') ? 'dark' : 'default' });
+    }
+    function restoreState() {
+      try { editor.value = localStorage.getItem(STORAGE_KEY) || '# Welcome\n\nStart writing Markdown here.\n\n```mermaid\nflowchart LR\n  A[Write] --> B[Preview]\n```\n'; }
+      catch (_) { editor.value = '# Welcome\n\nStart writing Markdown here.'; setSaveStatus('Local storage is unavailable'); }
+      try { if (localStorage.getItem(THEME_KEY) === 'dark') document.body.classList.add('dark'); } catch (_) {}
+      updateThemeButton(); configureMermaid();
+    }
+    function updateThemeButton() { themeButton.textContent = document.body.classList.contains('dark') ? 'Light mode' : 'Dark mode'; }
+    function updateStats(markdown) { const words = markdown.trim() ? markdown.trim().split(/\s+/).length : 0; editorStatus.textContent = `${words} word${words === 1 ? '' : 's'} · ${markdown.length} characters`; }
+    function save(markdown) { try { localStorage.setItem(STORAGE_KEY, markdown); setSaveStatus('Saved locally'); } catch (_) { setSaveStatus('Preview updated — local storage limit reached'); } }
+    function renderMarkdown() {
+      const revision = ++markdownRevision, markdown = editor.value;
+      if (!window.marked || !window.DOMPurify) { preview.textContent = 'Offline dependencies could not be loaded. Ensure the three files are present in ./vendor/.'; setSaveStatus('Dependencies unavailable'); return; }
+      try {
+        const parsed = marked.parse(markdown, { gfm:true, breaks:true });
+        preview.innerHTML = DOMPurify.sanitize(parsed, { ADD_DATA_URI_TAGS:['img'] });
+      } catch (error) { preview.textContent = `Markdown rendering error: ${error.message}`; }
+      updateStats(markdown); save(markdown); scheduleMermaid(revision);
+    }
+    function scheduleMermaid(revision) { clearTimeout(mermaidTimer); mermaidTimer = setTimeout(() => renderMermaidBlocks(revision), 400); }
+    async function renderMermaidBlocks(revision) {
+      if (revision !== markdownRevision || !window.mermaid) return;
+      const blocks = Array.from(preview.querySelectorAll('pre > code.language-mermaid'));
+      for (const code of blocks) {
+        if (revision !== markdownRevision) return;
+        const source = code.textContent, holder = document.createElement('div');
+        holder.className = 'mermaid'; holder.textContent = source; code.parentElement.replaceWith(holder);
+        try { await mermaid.run({ nodes:[holder] }); }
+        catch (error) {
+          const box = document.createElement('div'); box.className = 'mermaid-error';
+          const title = document.createElement('div'); title.className = 'mermaid-error-title'; title.textContent = 'Mermaid diagram syntax error';
+          const codeBox = document.createElement('pre'); const inner = document.createElement('code'); inner.textContent = source; codeBox.append(inner);
+          box.append(title, codeBox); holder.replaceWith(box);
+          console.warn('Mermaid rendering error:', error);
+        }
+      }
+      syncPreviewScroll();
+    }
+    function refreshEditor() { renderMarkdown(); editor.focus(); }
+    function selectedText(fallback) { return editor.value.slice(editor.selectionStart, editor.selectionEnd) || fallback; }
+    function replaceSelection(text, selectionMode='end') { editor.setRangeText(text, editor.selectionStart, editor.selectionEnd, selectionMode); refreshEditor(); }
+    function wrap(before, after=before, placeholder='text') { replaceSelection(before + selectedText(placeholder) + after); }
+    function heading(level) { const selected = selectedText('Heading'); replaceSelection(selected.split('\n').map(line => '#'.repeat(level) + ' ' + line.replace(/^#{1,6}\s+/, '')).join('\n')); }
+    function prefixLines(prefix, fallback) { replaceSelection(selectedText(fallback).split('\n').map(line => prefix + line).join('\n')); }
+    function numberedList() { replaceSelection(selectedText('Item').split('\n').map((line, index) => `${index + 1}. ${line}`).join('\n')); }
+    function insertLink() { const label = selectedText('link text'); const url = prompt('Link URL:', 'https://'); if (url !== null) replaceSelection(`[${label}](${url || 'https://example.com'})`); }
+    function insertImagePath() { const source = prompt('Image URL or relative path:', 'images/photo.png'); if (source !== null && source.trim()) replaceSelection(`![${selectedText('image description')}](${source.trim()})`); }
+    function insertCodeBlock() { replaceSelection(`\n\`\`\`\n${selectedText('code here')}\n\`\`\`\n`); }
+    function insertMermaid() { replaceSelection(`\n\`\`\`mermaid\n${selectedText('flowchart LR\n  A[Start] --> B{Decision}\n  B -->|Yes| C[Continue]\n  B -->|No| D[Stop]')}\n\`\`\`\n`); }
+    function insertTable() { replaceSelection(`\n| Column 1 | Column 2 |\n| --- | --- |\n| Value 1 | Value 2 |\n`); }
+    function insertHr() { replaceSelection('\n\n---\n\n'); }
+    function syncPreviewScroll() {
+      cancelAnimationFrame(scrollFrame); scrollFrame = requestAnimationFrame(() => {
+        const sourceRange = editor.scrollHeight - editor.clientHeight, previewRange = preview.scrollHeight - preview.clientHeight;
+        preview.scrollTop = sourceRange > 0 && previewRange > 0 ? (editor.scrollTop / sourceRange) * previewRange : 0; scrollFrame = null;
+      });
+    }
+    async function copyHtml() {
+      const html = preview.innerHTML;
+      try { await navigator.clipboard.writeText(html); setSaveStatus('Rendered HTML copied'); }
+      catch (_) { const temp = document.createElement('textarea'); temp.value = html; document.body.append(temp); temp.select(); document.execCommand('copy'); temp.remove(); setSaveStatus('Rendered HTML copied'); }
+    }
+    function downloadMarkdown() { const blob = new Blob([editor.value], {type:'text/markdown;charset=utf-8'}), link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'document.md'; link.click(); URL.revokeObjectURL(link.href); setSaveStatus('Markdown downloaded'); }
+    function clearDocument() {
+      if (!confirm('Clear the editor and remove the locally saved document?')) return;
+      editor.value = '';
+      try { localStorage.removeItem(STORAGE_KEY); setSaveStatus('Document cleared'); }
+      catch (_) { setSaveStatus('Editor cleared'); }
+      renderMarkdown(); editor.focus();
+    }
+    document.querySelector('.format-toolbar').addEventListener('click', event => {
+      const action = event.target.closest('button')?.dataset.action; if (!action) return;
+      const actions = { h1:()=>heading(1), h2:()=>heading(2), h3:()=>heading(3), bold:()=>wrap('**'), italic:()=>wrap('*'), strike:()=>wrap('~~'), inlineCode:()=>wrap('`'), quote:()=>prefixLines('> ','Quote'), bullets:()=>prefixLines('- ','Item'), numbered:numberedList, link:insertLink, imageFile:()=>imageInput.click(), imagePath:insertImagePath, codeBlock:insertCodeBlock, mermaid:insertMermaid, table:insertTable, hr:insertHr };
+      actions[action]();
+    });
+    imageInput.addEventListener('change', () => { const file = imageInput.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => { replaceSelection(`![${file.name}](${reader.result})`); setSaveStatus('Image embedded as Base64'); }; reader.onerror = () => setSaveStatus('Could not read image'); reader.readAsDataURL(file); imageInput.value = ''; });
+    editor.addEventListener('input', renderMarkdown); editor.addEventListener('scroll', syncPreviewScroll, {passive:true});
+    editor.addEventListener('keydown', event => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'b') { event.preventDefault(); wrap('**'); } if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'i') { event.preventDefault(); wrap('*'); } if (event.key === 'Tab') { event.preventDefault(); replaceSelection('  '); } });
+    themeButton.addEventListener('click', () => { const dark = document.body.classList.toggle('dark'); try { localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light'); } catch (_) {} updateThemeButton(); configureMermaid(); renderMarkdown(); });
+    document.getElementById('clearButton').addEventListener('click', clearDocument); document.getElementById('downloadButton').addEventListener('click', downloadMarkdown); document.getElementById('copyButton').addEventListener('click', copyHtml);
+    restoreState(); renderMarkdown();
+  })();
+  </script>
+</body>
+</html>
