@@ -237,7 +237,7 @@ Start replacing this guide with your own notes. Your work is saved locally as yo
       return new docx.ImageRun({ data, type, transformation:{ width, height } });
     }
     async function mermaidImageRun(holder) {
-      const svg = holder.querySelector('svg');
+      const svg = holder.matches('svg') ? holder : holder.querySelector('svg');
       if (!svg) return null;
       const clone = svg.cloneNode(true); clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
       const source = new Blob([new XMLSerializer().serializeToString(clone)], { type:'image/svg+xml' });
@@ -263,7 +263,7 @@ Start replacing this guide with your own notes. Your work is saved locally as yo
         if (tag === 'hr') { children.push(new docx.Paragraph({ text:'' })); continue; }
         // Mermaid replaces the original .mermaid class with a generated id after rendering.
         // Detect its SVG instead, so exported DOCX files contain the diagram as an image.
-        if (tag === 'div' && element.querySelector('svg')) {
+        if (element.matches('svg') || element.querySelector('svg')) {
           try { const image = await mermaidImageRun(element); if (image) children.push(new docx.Paragraph({ children:[image], alignment:docx.AlignmentType.CENTER })); else children.push(paragraphFrom(element)); }
           catch (_) { children.push(paragraphFrom(element)); }
           continue;
