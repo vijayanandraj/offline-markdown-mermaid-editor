@@ -265,7 +265,7 @@ Start replacing this guide with your own notes. Your work is saved locally as yo
         // Detect its SVG instead, so exported DOCX files contain the diagram as an image.
         if (element.matches('svg') || element.querySelector('svg')) {
           try { const image = await mermaidImageRun(element); if (image) children.push(new docx.Paragraph({ children:[image], alignment:docx.AlignmentType.CENTER })); else children.push(paragraphFrom(element)); }
-          catch (_) { children.push(paragraphFrom(element)); }
+          catch (error) { console.warn('Could not embed Mermaid diagram in DOCX:', error); children.push(paragraphFrom(element)); }
           continue;
         }
         const image = element.querySelector('img');
