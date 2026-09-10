@@ -20,6 +20,10 @@
     .github-star { display:inline-flex; align-items:center; gap:6px; border:1px solid #4b5563; border-radius:6px; padding:8px 11px; background:#1f2937; color:#fff; font-size:14px; line-height:1.2; text-decoration:none; white-space:nowrap; }
     .github-star:hover { background:#374151; }
     .github-star:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+    .template-control { display:flex; align-items:center; gap:6px; }
+    .template-control label { font-size:12px; color:#cbd5e1; }
+    .template-control select { max-width:190px; border:1px solid #4b5563; border-radius:6px; padding:8px 28px 8px 9px; background:#1f2937; color:#fff; font:inherit; font-size:14px; cursor:pointer; }
+    .template-control select:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
     .toolbar { min-height:58px; display:flex; align-items:center; gap:10px; padding:10px 14px; flex-wrap:wrap; background:var(--toolbar); color:var(--toolbar-text); border-bottom:1px solid var(--border); }
     .toolbar h1 { margin:0 auto 0 0; font-size:18px; font-weight:650; }
     .toolbar .status { font-size:12px; color:#cbd5e1; }
@@ -31,6 +35,10 @@
     .format-toolbar button { padding:6px 9px; border-color:var(--border); background:var(--panel); color:var(--text); font-size:13px; }
     .format-toolbar button:hover { background:var(--code-bg); }
     .separator { width:1px; height:24px; margin:0 3px; background:var(--border); }
+    .mermaid-picker { position:relative; }
+    .mermaid-menu { position:absolute; z-index:10; top:calc(100% + 6px); left:0; display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:5px; width:250px; padding:7px; border:1px solid var(--border); border-radius:8px; background:var(--panel); box-shadow:0 10px 24px rgba(0,0,0,.18); }
+    .mermaid-menu[hidden] { display:none; }
+    .mermaid-menu button { width:100%; text-align:left; white-space:nowrap; }
     #editor { flex:1; width:100%; min-height:0; resize:none; border:0; padding:20px; background:var(--panel); color:var(--text); font-family:"Cascadia Code","SFMono-Regular",Consolas,monospace; font-size:15px; line-height:1.65; tab-size:2; }
     #editor:focus { outline:none; }
     #preview { flex:1; min-height:0; overflow:auto; padding:20px 28px 50px; line-height:1.7; overflow-wrap:anywhere; }
@@ -63,13 +71,24 @@
       #preview pre, #preview code, #preview th { background:#f3f4f6; color:#111; }
       #preview .mermaid { break-inside:avoid; }
     }
-    @media (max-width:800px) { body { overflow:auto; } .toolbar h1 { width:100%; } .workspace { min-height:calc(100vh - 120px); grid-template-columns:1fr; grid-template-rows:minmax(420px,1fr) minmax(420px,1fr); } .pane:first-child { border-right:0; border-bottom:1px solid var(--border); } }
+    @media (max-width:800px) { body { overflow:auto; } .toolbar h1 { width:100%; } .template-control { flex:1; } .template-control select { flex:1; max-width:none; } .workspace { min-height:calc(100vh - 120px); grid-template-columns:1fr; grid-template-rows:minmax(420px,1fr) minmax(420px,1fr); } .pane:first-child { border-right:0; border-bottom:1px solid var(--border); } }
   </style>
 </head>
 <body>
   <header class="toolbar">
     <h1>Markdown Editor</h1>
     <span id="saveStatus" class="status" aria-live="polite">Saved locally</span>
+    <div class="template-control">
+      <label for="templateSelect">Template</label>
+      <select id="templateSelect">
+        <option value="">Choose a starter…</option>
+        <option value="skill">Agent skill (SKILL.md)</option>
+        <option value="copilot">GitHub Copilot instructions</option>
+        <option value="claude">Claude project instructions</option>
+        <option value="lld">Low-level design document</option>
+      </select>
+      <button id="loadTemplateButton" type="button" disabled>Use</button>
+    </div>
     <button id="themeButton" type="button">Dark mode</button>
     <button id="clearButton" type="button">Clear</button>
     <button id="pdfButton" type="button">Export PDF</button>
@@ -85,7 +104,7 @@
         <button type="button" data-action="h1" title="Heading 1">H1</button><button type="button" data-action="h2" title="Heading 2">H2</button><button type="button" data-action="h3" title="Heading 3">H3</button><span class="separator"></span>
         <button type="button" data-action="bold" title="Bold (Ctrl+B)"><b>B</b></button><button type="button" data-action="italic" title="Italic (Ctrl+I)"><i>I</i></button><button type="button" data-action="strike" title="Strikethrough">S̶</button><button type="button" data-action="inlineCode" title="Inline code">&lt;/&gt;</button><span class="separator"></span>
         <button type="button" data-action="quote" title="Block quote">Quote</button><button type="button" data-action="bullets" title="Bullet list">Bullets</button><button type="button" data-action="numbered" title="Numbered list">Numbered</button><button type="button" data-action="link" title="Insert link">Link</button><span class="separator"></span>
-        <button type="button" data-action="imageFile" title="Embed local image">Image file</button><button type="button" data-action="imagePath" title="Image URL or relative path">Image URL</button><button type="button" data-action="codeBlock" title="Code block">Code block</button><button type="button" data-action="mermaid" title="Mermaid diagram">Mermaid</button><button type="button" data-action="table" title="Table">Table</button><button type="button" data-action="hr" title="Horizontal rule">HR</button>
+        <button type="button" data-action="imageFile" title="Embed local image">Image file</button><button type="button" data-action="imagePath" title="Image URL or relative path">Image URL</button><button type="button" data-action="codeBlock" title="Code block">Code block</button><div class="mermaid-picker"><button id="mermaidButton" type="button" data-action="mermaid" title="Choose a Mermaid diagram type" aria-expanded="false" aria-controls="mermaidMenu">Diagram ▾</button><div id="mermaidMenu" class="mermaid-menu" role="group" aria-label="Mermaid diagram types" hidden><button type="button" data-mermaid-template="flowchart">Flowchart</button><button type="button" data-mermaid-template="sequence">Sequence</button><button type="button" data-mermaid-template="class">Class</button><button type="button" data-mermaid-template="state">State</button><button type="button" data-mermaid-template="er">Entity relationship</button><button type="button" data-mermaid-template="gantt">Gantt</button></div></div><button type="button" data-action="table" title="Table">Table</button><button type="button" data-action="hr" title="Horizontal rule">HR</button>
       </div>
       <input id="imageInput" class="sr-only" type="file" accept="image/*">
       <textarea id="editor" aria-label="Markdown editor" spellcheck="true" placeholder="Type or paste Markdown here..."></textarea>
@@ -145,6 +164,105 @@ console.log(message);
 ---
 
 Start replacing this guide with your own notes. Your work is saved locally as you type.`;
+    const DOCUMENT_TEMPLATES = Object.freeze({
+      skill: { name:'Agent skill (SKILL.md)', markdown:[
+        '# [Skill name]', '',
+        '> A short description of the capability this skill adds.', '',
+        '## Use this skill when', '',
+        '- [Describe the user goal or situation.]',
+        '- [List an important trigger or constraint.]', '',
+        '## Inputs', '',
+        '- **Required:** [What the skill needs to begin.]',
+        '- **Optional:** [Useful context, files, or preferences.]', '',
+        '## Workflow', '',
+        '1. [Understand the request and inspect the relevant inputs.]',
+        '2. [Perform the core work.]',
+        '3. [Verify the result before delivering it.]', '',
+        '## Output', '',
+        '- [State the artifact or outcome the user receives.]', '',
+        '## Guardrails', '',
+        '- [Record a safety, privacy, or quality requirement.]'
+      ].join('\n') },
+      copilot: { name:'GitHub Copilot instructions', markdown:[
+        '# Copilot instructions', '',
+        '## Project overview', '',
+        '[Explain what this project does, its main users, and its architecture.]', '',
+        '## Working conventions', '',
+        '- Keep changes focused and preserve existing behavior unless the task asks otherwise.',
+        '- Prefer the project\'s existing patterns, names, and dependencies.',
+        '- Explain user-visible changes clearly.', '',
+        '## Code style', '',
+        '- [Language-specific formatting and naming conventions.]',
+        '- [Error-handling, accessibility, security, or performance expectations.]', '',
+        '## Validation', '',
+        'Run the relevant checks before finishing:', '',
+        '```sh',
+        '# Add the project\'s lint, test, and build commands here.',
+        '```', '',
+        '## Files to know', '',
+        '- `[path]` — [why it matters.]'
+      ].join('\n') },
+      claude: { name:'Claude project instructions', markdown:[
+        '# CLAUDE.md', '',
+        '## Project', '',
+        '[Briefly describe the product, architecture, and the important directories.]', '',
+        '## Everyday commands', '',
+        '```sh',
+        '# Install dependencies',
+        '# Run the app',
+        '# Test and build',
+        '```', '',
+        '## How to work here', '',
+        '- Make small, reviewable changes.',
+        '- Read nearby code before introducing a new pattern.',
+        '- Keep user data and credentials out of logs and commits.', '',
+        '## Quality checks', '',
+        '- [Add lint, type-check, test, and build requirements.]', '',
+        '## Avoid', '',
+        '- [Document project-specific unsafe or unwanted changes.]'
+      ].join('\n') },
+      lld: { name:'Low-level design document', markdown:[
+        '# [Feature name] — Low-level design', '',
+        '## Goal', '',
+        '[State the problem, success criteria, and non-goals.]', '',
+        '## Context and constraints', '',
+        '- **Users:** [Who this serves.]',
+        '- **Dependencies:** [Services, libraries, or systems involved.]',
+        '- **Constraints:** [Latency, privacy, compatibility, or rollout requirements.]', '',
+        '## Component design', '',
+        '```mermaid',
+        'flowchart LR',
+        '  Client[Client] --> API[Feature API]',
+        '  API --> Service[Domain service]',
+        '  Service --> Store[(Data store)]',
+        '  Service --> Events[Event stream]',
+        '```', '',
+        '## Data model', '',
+        '| Entity | Key fields | Notes |',
+        '| --- | --- | --- |',
+        '| [Entity] | `id`, `status` | [Purpose] |', '',
+        '## Request flow', '',
+        '1. [Describe the client request.]',
+        '2. [Describe validation and core business logic.]',
+        '3. [Describe persistence, side effects, and the response.]', '',
+        '## Error handling and observability', '',
+        '- **Failures:** [Expected errors and user-facing behavior.]',
+        '- **Metrics:** [Important counters, timings, or events.]',
+        '- **Logs:** [Safe diagnostic context to record.]', '',
+        '## Test plan', '',
+        '- [Unit tests]',
+        '- [Integration tests]',
+        '- [Edge cases and rollback plan]'
+      ].join('\n') }
+    });
+    const MERMAID_TEMPLATES = Object.freeze({
+      flowchart:['flowchart LR', '  A[Start] --> B{Decision}', '  B -->|Yes| C[Continue]', '  B -->|No| D[Stop]'].join('\n'),
+      sequence:['sequenceDiagram', '  participant User', '  participant App', '  participant Service', '  User->>App: Submit request', '  App->>Service: Validate and process', '  Service-->>App: Return result', '  App-->>User: Show result'].join('\n'),
+      class:['classDiagram', '  class Document {', '    +String content', '    +render()', '  }', '  class Preview {', '    +update(html)', '  }', '  Document --> Preview : renders into'].join('\n'),
+      state:['stateDiagram-v2', '  [*] --> Draft', '  Draft --> Review: Submit', '  Review --> Draft: Request changes', '  Review --> Published: Approve', '  Published --> [*]'].join('\n'),
+      er:['erDiagram', '  USER ||--o{ DOCUMENT : owns', '  USER {', '    string id', '    string name', '  }', '  DOCUMENT {', '    string id', '    string title', '    string owner_id', '  }'].join('\n'),
+      gantt:['gantt', '  title Documentation plan', '  dateFormat  YYYY-MM-DD', '  section Draft', '  Outline     :done, 2026-01-01, 2d', '  Write       :active, 2026-01-03, 3d', '  section Review', '  Review      :2026-01-06, 2d'].join('\n')
+    });
     const editor = document.getElementById('editor');
     const preview = document.getElementById('preview');
     const editorStatus = document.getElementById('editorStatus');
@@ -152,6 +270,10 @@ Start replacing this guide with your own notes. Your work is saved locally as yo
     const themeButton = document.getElementById('themeButton');
     const imageInput = document.getElementById('imageInput');
     const docxButton = document.getElementById('docxButton');
+    const templateSelect = document.getElementById('templateSelect');
+    const loadTemplateButton = document.getElementById('loadTemplateButton');
+    const mermaidButton = document.getElementById('mermaidButton');
+    const mermaidMenu = document.getElementById('mermaidMenu');
     let markdownRevision = 0, mermaidTimer = null, scrollFrame = null;
 
     function setSaveStatus(message) { saveStatus.textContent = message; }
@@ -208,6 +330,31 @@ Start replacing this guide with your own notes. Your work is saved locally as yo
     function insertCodeBlock() { replaceSelection(`\n\`\`\`\n${selectedText('code here')}\n\`\`\`\n`); }
     function insertMermaid() { replaceSelection(`\n\`\`\`mermaid\n${selectedText('flowchart LR\n  A[Start] --> B{Decision}\n  B -->|Yes| C[Continue]\n  B -->|No| D[Stop]')}\n\`\`\`\n`); }
     function insertTable() { replaceSelection(`\n| Column 1 | Column 2 |\n| --- | --- |\n| Value 1 | Value 2 |\n`); }
+    function insertMermaidTemplate(type) {
+      const source = MERMAID_TEMPLATES[type] || MERMAID_TEMPLATES.flowchart;
+      const fence = String.fromCharCode(96).repeat(3);
+      replaceSelection('\n' + fence + 'mermaid\n' + selectedText(source) + '\n' + fence + '\n');
+    }
+    function closeMermaidMenu() {
+      mermaidMenu.hidden = true;
+      mermaidButton.setAttribute('aria-expanded', 'false');
+    }
+    function toggleMermaidMenu() {
+      const open = mermaidMenu.hidden;
+      mermaidMenu.hidden = !open;
+      mermaidButton.setAttribute('aria-expanded', String(open));
+    }
+    function loadTemplate() {
+      const template = DOCUMENT_TEMPLATES[templateSelect.value];
+      if (!template) return;
+      if (editor.value.trim() && !confirm('Replace the current document with the ' + template.name + ' template?')) return;
+      editor.value = template.markdown;
+      templateSelect.value = '';
+      loadTemplateButton.disabled = true;
+      renderMarkdown();
+      setSaveStatus(template.name + ' template loaded');
+      editor.focus();
+    }
     function insertHr() { replaceSelection('\n\n---\n\n'); }
     function syncPreviewScroll() {
       cancelAnimationFrame(scrollFrame); scrollFrame = requestAnimationFrame(() => {
@@ -298,11 +445,18 @@ Start replacing this guide with your own notes. Your work is saved locally as yo
       renderMarkdown(); editor.focus();
     }
     document.querySelector('.format-toolbar').addEventListener('click', event => {
+      const mermaidTemplate = event.target.closest('button')?.dataset.mermaidTemplate;
+      if (mermaidTemplate) { insertMermaidTemplate(mermaidTemplate); closeMermaidMenu(); return; }
       const action = event.target.closest('button')?.dataset.action; if (!action) return;
-      const actions = { h1:()=>heading(1), h2:()=>heading(2), h3:()=>heading(3), bold:()=>wrap('**'), italic:()=>wrap('*'), strike:()=>wrap('~~'), inlineCode:()=>wrap('`'), quote:()=>prefixLines('> ','Quote'), bullets:()=>prefixLines('- ','Item'), numbered:numberedList, link:insertLink, imageFile:()=>imageInput.click(), imagePath:insertImagePath, codeBlock:insertCodeBlock, mermaid:insertMermaid, table:insertTable, hr:insertHr };
+      if (action === 'mermaid') { toggleMermaidMenu(); return; }
+      const actions = { h1:()=>heading(1), h2:()=>heading(2), h3:()=>heading(3), bold:()=>wrap('**'), italic:()=>wrap('*'), strike:()=>wrap('~~'), inlineCode:()=>wrap('`'), quote:()=>prefixLines('> ','Quote'), bullets:()=>prefixLines('- ','Item'), numbered:numberedList, link:insertLink, imageFile:()=>imageInput.click(), imagePath:insertImagePath, codeBlock:insertCodeBlock, table:insertTable, hr:insertHr };
       actions[action]();
     });
     imageInput.addEventListener('change', () => { const file = imageInput.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => { replaceSelection(`![${file.name}](${reader.result})`); setSaveStatus('Image embedded as Base64'); }; reader.onerror = () => setSaveStatus('Could not read image'); reader.readAsDataURL(file); imageInput.value = ''; });
+    templateSelect.addEventListener('change', () => { loadTemplateButton.disabled = !templateSelect.value; });
+    loadTemplateButton.addEventListener('click', loadTemplate);
+    document.addEventListener('click', event => { if (!event.target.closest('.mermaid-picker')) closeMermaidMenu(); });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') closeMermaidMenu(); });
     editor.addEventListener('input', renderMarkdown); editor.addEventListener('scroll', syncPreviewScroll, {passive:true});
     editor.addEventListener('keydown', event => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'b') { event.preventDefault(); wrap('**'); } if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'i') { event.preventDefault(); wrap('*'); } if (event.key === 'Tab') { event.preventDefault(); replaceSelection('  '); } });
     themeButton.addEventListener('click', () => { const dark = document.body.classList.toggle('dark'); try { localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light'); } catch (_) {} updateThemeButton(); configureMermaid(); renderMarkdown(); });

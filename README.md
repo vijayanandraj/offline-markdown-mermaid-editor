@@ -8,6 +8,8 @@ A free, local-first Markdown editor with live preview and Mermaid diagram suppor
 - Mermaid fenced blocks rendered locally
 - Local image embedding as Base64, plus image URLs and relative paths
 - Formatting toolbar, dark mode, local autosave, Markdown download, PDF/DOCX export, HTML copy, and scroll sync
+- Starter templates for `SKILL.md`, GitHub Copilot instructions, `CLAUDE.md`, and low-level design documentation
+- A Mermaid diagram picker with Flowchart, Sequence, Class, State, Entity Relationship, and Gantt starters
 - Works without network access after its browser dependencies are available
 
 ## Run locally
